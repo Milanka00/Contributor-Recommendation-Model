@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-dotenv
+pandas
+numpy
+nltk
+sentence-transformers
+scikit-learn
+joblib
+torch
+PyGithub
