@@ -56,7 +56,7 @@ with open(PRIVATE_KEY_PATH, "r") as key_file:
 # Create JWT
 payload = {
     "iat": int(time.time()) - 60,
-    "exp": int(time.time()) + 600,
+    "exp": int(time.time()) + (9 * 60),
     "iss": GITHUB_APP_ID
 }
 jwt_token = jwt.encode(payload, private_key, algorithm="RS256")
@@ -161,9 +161,9 @@ async def github_webhook(req: Request):
 
             # Prepare response comment
             if recommended:
-                response = "Recommended contributors for this issue:\n"
-                for i, contributor in enumerate(recommended, 1):
-                    response += f"{i}. @{contributor}\n"
+                response = "Recommended contributors for this issue:\n\n" + recommended
+                # for i, contributor in enumerate(recommended, 1):
+                #     response += f"{i}. @{contributor}\n"
             else:
                 response = "Sorry, I couldn't find a suitable contributor at this time."
 

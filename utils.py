@@ -11,6 +11,7 @@ from nltk.stem import PorterStemmer
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.util import cos_sim
 from collections import defaultdict
+from tabulate import tabulate
 
 import nltk
 nltk.download("stopwords")
@@ -50,6 +51,7 @@ def extract_file_patterns(text):
 def load_data(new_issue_df, pr_path, train_path, con_path):
 
     issues_df = new_issue_df
+    # issues_df = pd.read_csv(new_issue_df)
     prs_df = pd.read_csv(pr_path).head(20000)
     train_df = pd.read_csv(train_path)
     con_df = pd.read_csv(con_path)
@@ -98,13 +100,20 @@ def recommend_contributors_for_issue(issue_row, model, train_vectors, pr_vectors
     issue_scores = cos_sim(test_vec, train_vectors)[0]
     top_issue_indices = torch.topk(issue_scores, k=20).indices.tolist()
 
-    final_score_map = defaultdict(float)
+    final_score_map = defaultdict(lambda: {
+        "score": 0.0,
+        "similar_issues": [],
+        "similar_prs": []
+    })
+
     for idx in top_issue_indices:
         score = issue_scores[idx].item()
         assignees = train_df.iloc[idx]['Assignees']
         assignees = assignees if isinstance(assignees, list) else [assignees]
         for a in assignees:
-            final_score_map[a] += score
+            final_score_map[a]["score"] += score
+            if len(final_score_map[a]["similar_issues"]) < 3:
+                final_score_map[a]["similar_issues"].append(train_df.iloc[idx]['Issue number'])
 
     pr_scores = cos_sim(test_vec, pr_vectors)[0]
     top_pr_indices = torch.topk(pr_scores, k=15).indices.tolist()
@@ -120,7 +129,9 @@ def recommend_contributors_for_issue(issue_row, model, train_vectors, pr_vectors
         else: contributors.append(row_pr['Assignees'])
 
         for c in contributors:
-            final_score_map[c] += score
+            final_score_map[c]["score"] += score
+            if len(final_score_map[c]["similar_prs"]) < 3:
+                final_score_map[c]["similar_prs"].append(row_pr['PR number'])
 
     def get_label_freq(label, stats):
         if not label or not isinstance(stats, list): return 0
@@ -135,13 +146,15 @@ def recommend_contributors_for_issue(issue_row, model, train_vectors, pr_vectors
         return sum(1 for f in issue_files if f in changed_files_freq)
 
     candidate_rows = []
-    for c, s in final_score_map.items():
+    for c, info in final_score_map.items():
         con_row = con_df[con_df['user'] == c]
         if con_row.empty: continue
         con_row = con_row.iloc[0]
         candidate_rows.append({
             'contributor': c,
-            'score': s,
+            'score': info['score'],
+            'similar_issues': info['similar_issues'],
+            'similar_prs': info['similar_prs'],
             'sig_label_score': get_label_freq(sig_label, con_row['sig_label_stats']),
             'area_label_score': get_label_freq(area_label, con_row['area_label_stats']),
             'kind_label_score': get_label_freq(kind_label, con_row['kind_label_stats']),
@@ -161,7 +174,19 @@ def recommend_contributors_for_issue(issue_row, model, train_vectors, pr_vectors
     pred_df['rank_score'] = ranker_model.predict(pred_df[features])
     pred_df = pred_df.sort_values(by='rank_score', ascending=False)
 
-    return pred_df.head(top_k)['contributor'].tolist(), issue_row['Assignees']
+    # Build formatted markdown table with rank, contributor, similar issues, similar PRs
+    table_data = []
+    for rank, (_, row) in enumerate(pred_df.head(top_k).iterrows(), start=1):
+        contributor = f"@{row['contributor']}"
+        issues = ', '.join([f"#{i}" for i in row['similar_issues']]) or "None"
+        prs = ', '.join([f"#{p}" for p in row['similar_prs']]) or "None"
+        table_data.append([rank, contributor, issues, prs])
+
+    headers = ["Rank", "Contributor", "Similar Issues", "Similar PRs"]
+    markdown_table = tabulate(table_data, headers=headers, tablefmt="github")
+
+    return markdown_table, issue_row['Assignees']
+
 
 # if __name__ == "__main__":
 #     issue_path = 'data/issues_df.csv'
@@ -182,5 +207,6 @@ def recommend_contributors_for_issue(issue_row, model, train_vectors, pr_vectors
 #     issue_row = issues_df.iloc[54]
 #     recommended, actual = recommend_contributors_for_issue(issue_row, model, train_vectors, pr_vectors, train_df, prs_df, con_df, ranker_model, scaler)
     
-#     print("Recommended Contributors:", recommended)
-#     print("Actual Assignees:", actual)
+#     print("Recommended Contributors:")
+#     print(recommended)
+#     # print("Actual Assignees:", actual)
