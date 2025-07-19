@@ -4,13 +4,14 @@ from dotenv import load_dotenv
 from github import Github
 from utils import recommend_contributors_for_issue, load_data
 import pandas as pd
-import torch
 import joblib
 from sentence_transformers import SentenceTransformer
 import jwt
 import time
 import requests
 import os
+import numpy as np
+
 
 # Load environment variables
 # load_dotenv()
@@ -21,26 +22,6 @@ import os
 # app = FastAPI()
 # gh = Github(GITHUB_TOKEN)
 # repo = gh.get_repo(REPO_NAME)
-import os
-import time
-import requests
-import jwt
-from fastapi import FastAPI
-from dotenv import load_dotenv
-import torch
-import joblib
-from sentence_transformers import SentenceTransformer
-
-import os
-import time
-import requests
-import jwt
-from fastapi import FastAPI
-from dotenv import load_dotenv
-import torch
-import joblib
-from sentence_transformers import SentenceTransformer
-from github import Github  # Needed to use Github API
 
 # Load environment variables
 load_dotenv()
@@ -90,8 +71,11 @@ con_path = 'data/merged_con_availability_stats.csv'
 
 # issues_df, prs_df, train_df, con_df = load_data(issue_path, pr_path, train_path, con_path)
 model = SentenceTransformer('all-MiniLM-L6-v2')
-train_vectors = torch.load('models/train_vectors.pt')
-pr_vectors = torch.load('models/pr_vectors.pt')
+# train_vectors = torch.load('models/train_vectors.pt')
+# pr_vectors = torch.load('models/pr_vectors.pt')
+train_vectors = np.load('models_npy/train_vectors.npy', allow_pickle=True)
+pr_vectors = np.load('models_npy/pr_vectors.npy', allow_pickle=True)
+
 ranker_model = joblib.load('models/ranker_model.pkl')
 scaler = joblib.load('models/label_scaler.pkl')
 
