@@ -7,7 +7,6 @@ nltk
 sentence-transformers
 scikit-learn
 joblib
-# torch
 PyGithub
 tabulate
 lightgbm
